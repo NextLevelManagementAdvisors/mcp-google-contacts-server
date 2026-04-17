@@ -8,6 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+.venv-oauth/
+oauth_consent.py
 token.json
 credentials.json
 .env
