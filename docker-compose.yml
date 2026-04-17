@@ -1,0 +1,17 @@
+services:
+  contacts-mcp:
+    build: .
+    image: contacts-mcp:latest
+    container_name: contacts-mcp
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+      - contacts-mcp-token:/app/.token
+    command: ["--transport", "http", "--host", "0.0.0.0", "--port", "8000"]
+
+volumes:
+  contacts-mcp-token:

@@ -10,3 +10,6 @@ wheels/
 .venv
 token.json
 credentials.json
+.env
+.env.*
+!.env.example

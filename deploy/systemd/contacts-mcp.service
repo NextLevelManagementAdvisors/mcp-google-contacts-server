@@ -1,0 +1,22 @@
+[Unit]
+Description=MCP Google Contacts Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=contacts-mcp
+Group=contacts-mcp
+WorkingDirectory=/opt/contacts-mcp
+EnvironmentFile=/opt/contacts-mcp/.env
+ExecStart=/opt/contacts-mcp/.venv/bin/mcp-google-contacts --transport http --host 127.0.0.1 --port 8000 --credentials-file /opt/contacts-mcp/credentials.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/contacts-mcp
+
+[Install]
+WantedBy=multi-user.target
