@@ -127,7 +127,7 @@ class GoogleContactsService:
             
             # If credentials don't exist or are invalid, go through auth flow
             if not creds or not creds.valid:
-                if creds and creds.expired and creds.refresh_token:
+                if creds and creds.refresh_token:
                     creds.refresh(Request())
                 else:
                     if not self.credentials_info:
