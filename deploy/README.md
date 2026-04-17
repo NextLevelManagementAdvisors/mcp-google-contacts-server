@@ -88,3 +88,25 @@ systemctl restart contacts-mcp
 - `.env` and `credentials.json` are gitignored. Transfer out-of-band; never commit.
 - If this hostname ever gets customer-facing traffic, add basic auth or a
   bearer token check in the nginx config before that happens.
+
+## Multi-tenant (per-user Google OAuth) mode
+
+Set `AUTH_MODE=multi` to let any Google user sign in and query their own
+contacts. Requires a **Web application** OAuth client (not Desktop) with
+redirect URI `https://contacts.nlma.io/oauth/google/callback` and a
+published OAuth consent screen (External, test users for launch).
+
+Additional `.env` keys:
+
+```
+AUTH_MODE=multi
+GOOGLE_WEB_CLIENT_ID=...
+GOOGLE_WEB_CLIENT_SECRET=...
+OAUTH_ISSUER_URL=https://contacts.nlma.io
+GOOGLE_OAUTH_REDIRECT_URI=https://contacts.nlma.io/oauth/google/callback
+# DB_PATH=/opt/contacts-mcp/data.db  # optional override
+```
+
+Per-user refresh tokens land in `/opt/contacts-mcp/data.db`. Treat that
+file like a secret: `chmod 600`, no world-readable backups. Remove a
+user: `sqlite3 data.db "delete from users where google_email='x@y'; delete from access_tokens where google_email='x@y'; delete from refresh_tokens where google_email='x@y';"`

@@ -1,15 +1,26 @@
 """MCP tools implementation for Google Contacts."""
 import asyncio
-from typing import Dict, List, Optional, Any, Union
-from mcp.server.fastmcp import FastMCP
+import threading
+import time
 import traceback
+from collections import OrderedDict
+from typing import Dict, List, Optional, Any, Union
+
+from mcp.server.auth.middleware.auth_context import get_access_token
+from mcp.server.fastmcp import FastMCP
 
 from mcp_google_contacts_server.google_contacts_service import GoogleContactsService, GoogleContactsError
 from mcp_google_contacts_server.formatters import format_contact, format_contacts_list, format_directory_people
 from mcp_google_contacts_server.config import config
 
-# Global service instance
+# Global service instance (single-tenant mode only)
 contacts_service = None
+
+# Per-user service cache (multi-tenant mode)
+_SERVICE_CACHE_MAX = 64
+_SERVICE_CACHE_TTL = 55 * 60  # rebuild just before Google's 1h access-token expiry
+_service_cache_lock = threading.Lock()
+_service_cache: "OrderedDict[str, tuple[GoogleContactsService, float]]" = OrderedDict()
 
 def init_service() -> Optional[GoogleContactsService]:
     """Initialize and return a Google Contacts service instance.
@@ -51,6 +62,65 @@ def init_service() -> Optional[GoogleContactsService]:
         traceback.print_exc()
         return None
 
+
+def _service_for_email(google_email: str) -> Optional[GoogleContactsService]:
+    """Build (or reuse) a GoogleContactsService for a specific user in multi-tenant mode.
+
+    Looks up the user's refresh_token in the DB, constructs a per-user service,
+    and caches it briefly so consecutive tool calls in a session don't repeatedly
+    round-trip to Google's token endpoint.
+    """
+    now = time.monotonic()
+    with _service_cache_lock:
+        entry = _service_cache.get(google_email)
+        if entry and entry[1] > now:
+            _service_cache.move_to_end(google_email)
+            return entry[0]
+
+    # Import here to avoid a circular import at module load time
+    from mcp_google_contacts_server.db import Db
+
+    db = Db(config.db_path)
+    user = db.get_user(google_email)
+    if not user:
+        return None
+
+    try:
+        svc = GoogleContactsService.from_tokens(
+            client_id=config.google_web_client_id,
+            client_secret=config.google_web_client_secret,
+            refresh_token=user["google_refresh_token"],
+        )
+    except Exception as e:
+        print(f"Failed to build service for {google_email}: {e}")
+        traceback.print_exc()
+        return None
+
+    db.touch_user(google_email)
+
+    with _service_cache_lock:
+        _service_cache[google_email] = (svc, now + _SERVICE_CACHE_TTL)
+        _service_cache.move_to_end(google_email)
+        while len(_service_cache) > _SERVICE_CACHE_MAX:
+            _service_cache.popitem(last=False)
+    return svc
+
+
+def _resolve_service() -> Optional[GoogleContactsService]:
+    """Return the service appropriate for the current request.
+
+    In single mode: shared global (init_service).
+    In multi mode: the caller's per-user service via the bearer-token context.
+    """
+    if config.auth_mode == "multi":
+        tok = get_access_token()
+        email = getattr(tok, "google_email", None) if tok else None
+        if not email:
+            return None
+        return _service_for_email(email)
+    return init_service()
+
+
 def register_tools(mcp: FastMCP) -> None:
     """Register all Google Contacts tools with the MCP server.
     
@@ -66,7 +136,7 @@ def register_tools(mcp: FastMCP) -> None:
             name_filter: Optional filter to find contacts by name
             max_results: Maximum number of results to return (default: 100)
         """
-        service = init_service()
+        service = _resolve_service()
         if not service:
             return "Error: Google Contacts service is not available. Please check your credentials."
         
@@ -83,7 +153,7 @@ def register_tools(mcp: FastMCP) -> None:
         Args:
             identifier: Resource name (people/*) or email address of the contact
         """
-        service = init_service()
+        service = _resolve_service()
         if not service:
             return "Error: Google Contacts service is not available. Please check your credentials."
         
@@ -104,7 +174,7 @@ def register_tools(mcp: FastMCP) -> None:
             email: Email address of the contact
             phone: Phone number of the contact
         """
-        service = init_service()
+        service = _resolve_service()
         if not service:
             return "Error: Google Contacts service is not available. Please check your credentials."
         
@@ -132,7 +202,7 @@ def register_tools(mcp: FastMCP) -> None:
             email: Updated email address
             phone: Updated phone number
         """
-        service = init_service()
+        service = _resolve_service()
         if not service:
             return "Error: Google Contacts service is not available. Please check your credentials."
         
@@ -155,7 +225,7 @@ def register_tools(mcp: FastMCP) -> None:
         Args:
             resource_name: Contact resource name (people/*) to delete
         """
-        service = init_service()
+        service = _resolve_service()
         if not service:
             return "Error: Google Contacts service is not available. Please check your credentials."
         
@@ -176,7 +246,7 @@ def register_tools(mcp: FastMCP) -> None:
             query: Search term to find in contacts
             max_results: Maximum number of results to return (default: 10)
         """
-        service = init_service()
+        service = _resolve_service()
         if not service:
             return "Error: Google Contacts service is not available. Please check your credentials."
         
@@ -216,7 +286,7 @@ def register_tools(mcp: FastMCP) -> None:
             query: Optional search term to find specific users (name, email, etc.)
             max_results: Maximum number of results to return (default: 50)
         """
-        service = init_service()
+        service = _resolve_service()
         if not service:
             return "Error: Google Contacts service is not available. Please check your credentials."
         
@@ -236,7 +306,7 @@ def register_tools(mcp: FastMCP) -> None:
             query: Search term to find specific directory members
             max_results: Maximum number of results to return (default: 20)
         """
-        service = init_service()
+        service = _resolve_service()
         if not service:
             return "Error: Google Contacts service is not available. Please check your credentials."
         
@@ -256,7 +326,7 @@ def register_tools(mcp: FastMCP) -> None:
         Args:
             max_results: Maximum number of results to return (default: 50)
         """
-        service = init_service()
+        service = _resolve_service()
         if not service:
             return "Error: Google Contacts service is not available. Please check your credentials."
         
