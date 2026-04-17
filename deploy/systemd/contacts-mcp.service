@@ -1,0 +1,16 @@
+# /etc/systemd/system/contacts-mcp.service
+[Unit]
+Description=MCP Google Contacts Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/contacts-mcp
+EnvironmentFile=/opt/contacts-mcp/.env
+ExecStart=/opt/contacts-mcp/.venv/bin/mcp-google-contacts --transport http --host 127.0.0.1 --port 8020 --credentials-file /opt/contacts-mcp/credentials.json
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
