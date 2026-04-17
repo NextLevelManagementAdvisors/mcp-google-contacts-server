@@ -100,6 +100,9 @@ def main():
         print(f"Running with HTTP transport on {args.host}:{args.port}")
         mcp.settings.host = args.host
         mcp.settings.port = args.port
+        extra_hosts = [h for h in os.environ.get("MCP_ALLOWED_HOSTS", "").split(",") if h]
+        if extra_hosts:
+            mcp.settings.transport_security.allowed_hosts.extend(extra_hosts)
         mcp.run(transport='streamable-http')
 
 if __name__ == "__main__":
