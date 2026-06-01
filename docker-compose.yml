@@ -1,0 +1,11 @@
+services:
+  contacts-mcp:
+    build: .
+    image: contacts-mcp:nlma
+    container_name: contacts-mcp
+    restart: unless-stopped
+    env_file: .env
+    network_mode: host
+    working_dir: /opt/contacts-mcp
+    volumes:
+      - /opt/contacts-mcp:/opt/contacts-mcp

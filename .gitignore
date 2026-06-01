@@ -1,17 +1,12 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-.venv-oauth/
-oauth_consent.py
-token.json
-credentials.json
 .env
 .env.*
 !.env.example
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+*.log
+*.db
+credentials.json
+token*.json
