@@ -15,3 +15,5 @@ credentials.json
 .env
 .env.*
 !.env.example
+# Google OAuth client secrets (never commit)
+client_secret_*.json
