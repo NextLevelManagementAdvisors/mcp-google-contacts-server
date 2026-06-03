@@ -1,12 +1,12 @@
-# Python-generated files
+.env
+.env.*
+!.env.example
+.venv/
+venv/
 __pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-token.json
+*.pyc
+*.egg-info/
+*.log
+*.db
 credentials.json
+token*.json
